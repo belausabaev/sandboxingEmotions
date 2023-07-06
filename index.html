@@ -1,0 +1,515 @@
+<!-- babylon-webxr/index.html -->
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Babylon WebXR Theremin</title>
+
+  <!-- Embed latest version of Babylon.js. -->
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+
+  <!-- Embed Babylon loader scripts for .gltf and other filetypes. -->
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+
+  <!-- Embed pep.js for consistent cross-browser pointer events. -->
+  <script src="https://code.jquery.com/pep/0.4.3/pep.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/tweakpane@2.1.1/dist/tweakpane.min.js"></script>
+
+  <style>
+    html,
+    body {
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    #render-canvas {
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+  </style>
+
+</head>
+
+<body>
+  <canvas id="render-canvas"></canvas>
+
+  <!-- Our Babylon.js implementation. -->
+  <script>
+    // Identify canvas element to script.
+    const canvas = document.getElementById('render-canvas');
+
+    // Initialize Babylon.js variables.
+    let engine,
+      scene,
+      sceneToRender;
+    const createDefaultEngine = function () {
+      return new BABYLON.Engine(canvas, true, {
+        preserveDrawingBuffer: true,
+        stencil: true
+      });
+    };
+
+    // Create scene and create XR experience.
+    const createScene = async function () {
+
+      // Create a basic Babylon XR scene
+      let scene = new BABYLON.Scene(engine);
+      //var hk = new BABYLON.HavokPlugin();
+      //scene.enablePhysics(new BABYLON.Vector3(0, -9.81, 0), hk);
+      scene.useRightHandedSystem = true;
+
+      const assumedFramesPerSecond = 60;
+      const earthGravity = -9.81;
+      scene.gravity = new BABYLON.Vector3(0, earthGravity / assumedFramesPerSecond, 0);
+      //let camera = new BABYLON.UniversalCamera('camera-1', new BABYLON.Vector3(0, 1.5, -1), scene);
+      const camera = new BABYLON.ArcRotateCamera("camera", 1, 0, 1, BABYLON.Vector3(0, 0, 0), scene);
+      // camera.collisionRadius = new BABYLON.Vector3(0.5, 0.5, 0.5);
+
+      camera.setTarget(new BABYLON.Vector3(1, 1, 1.6));
+      //      camera.setTarget(BABYLON.Vector3.Zero());
+
+      // camera.attachControl(canvas, true);
+      scene.onPointerDown = function () {
+        scene.onPointerDown = undefined;
+        camera.attachControl(canvas, true);
+      };
+
+      camera.inputs.addMouseWheel();
+
+      camera.applyGravity = true;
+      camera.ellipsoid = new BABYLON.Vector3(1, 1, 1);
+      scene.collisionsEnabled = true;
+      camera.checkCollisions = true;
+
+      //      let light = new BABYLON.SpotLight("spotLight", new BABYLON.Vector3(0, 2, 0), new BABYLON.Vector3(0, -1, 0), Math.PI, 5, scene);
+      // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+      const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+      light.intensity = 5;
+
+      const pointlight = new BABYLON.PointLight("pointLight", new BABYLON.Vector3(0, 10, 0), scene);
+
+      // scene.clearColor = BABYLON.Color3.Black();
+
+
+      const ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 100, height: 100 });
+      ground.checkCollisions = true;
+
+
+
+      var texture = BABYLON.CubeTexture.CreateFromPrefilteredData("/textures/environment.dds", scene);
+      //scene.environmentTexture = texture;
+      //scene.createDefaultSkybox(scene.environmentTexture);
+
+      var videoDome = new BABYLON.VideoDome(
+        "videoDome",
+        ["https://assets.babylonjs.com/photoDomes/solarProbeMission.mp4"],
+        {
+          resolution: 32,
+          clickToPlay: true
+        },
+        scene
+      );
+
+      /*
+        var photoDome = new BABYLON.PhotoDome("photodome", "./textures/sc1small.jpg", { resolution: 32, size: 1000 }, scene);
+  
+        // Skybox
+        var skysphere = BABYLON.Mesh.CreateSphere("skySphere", 50, 1000.0, scene);
+        var skysphereMaterial = new BABYLON.PBRMaterial("skysphere", scene);
+        skysphereMaterial.backFaceCulling = false;
+        skysphereMaterial.reflectionTexture = photoDome.texture.clone();
+        skysphereMaterial.reflectivityTexture = photoDome.texture.clone();
+        skysphereMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+        skysphere.material = skysphereMaterial;
+  */
+      //var hdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("./textures/sc1smalltestSpecularHDR.dds", scene);
+      /*
+      var hdrSkybox = BABYLON.Mesh.CreateBox("hdrSkyBox", 1500.0, scene);
+      var hdrSkyboxMaterial = new BABYLON.PBRMaterial("skyBox", scene);
+      hdrSkyboxMaterial.backFaceCulling = false;
+      hdrSkyboxMaterial.reflectionTexture = hdrTexture.clone();
+      hdrSkyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+      hdrSkyboxMaterial.microSurface = 1.0;
+      hdrSkyboxMaterial.disableLighting = true;
+      hdrSkybox.material = hdrSkyboxMaterial;
+      hdrSkybox.infiniteDistance = true;
+*/
+
+
+      var pitchAntennaPosition = new BABYLON.Vector3();
+      var volumeAntennaPosition = new BABYLON.Vector3();
+      var onOffButton = new BABYLON.Mesh();
+      var dial4 = new BABYLON.Mesh();
+      var dial3 = new BABYLON.Mesh();
+      var dial2 = new BABYLON.Mesh();
+      var dial1 = new BABYLON.Mesh();
+      var einAus = new BABYLON.Mesh();
+      var dial4Text = new BABYLON.Mesh();
+      var dial3Text = new BABYLON.Mesh();
+      var dial2Text = new BABYLON.Mesh();
+      var dial1Text = new BABYLON.Mesh();
+      var floor = new BABYLON.Mesh();
+
+      /*
+      BABYLON.SceneLoader.ImportMesh("", "", "THEREMIN.babylon", scene, function () {
+        // Get location of antennae
+        floor = scene.getMeshByName("Floor");
+        pitchAntennaPosition = scene.getMeshByName("PitchAntenna").position;
+        volumeAntennaPosition = scene.getMeshByName("VolumeAntenna").position;
+        onOffButton = scene.getMeshByName("On_Off");
+        dial4 = scene.getMeshByName("Dial_4");
+        dial3 = scene.getMeshByName("Dial_3");
+        dial2 = scene.getMeshByName("Dial_2");
+        dial1 = scene.getMeshByName("Dial_1");
+        einAus = scene.getMeshByName("Ein_Aus");
+        dial4Text = scene.getMeshByName("Dial4Text");
+        dial3Text = scene.getMeshByName("Dial3Text");
+        dial2Text = scene.getMeshByName("Dial2Text");
+        dial1Text = scene.getMeshByName("Dial1Text");
+        einAus.setEnabled(false);
+        dial4Text.setEnabled(false);
+        dial3Text.setEnabled(false);
+        dial2Text.setEnabled(false);
+        dial1Text.setEnabled(false);
+      });
+
+      floor.checkCollisions = true;
+*/
+      /*
+      BABYLON.SceneLoader.ImportMeshAsync("", "", "28.06.2023.glb").then((result) => {
+        console.log(result);
+
+        result.meshes[1].checkCollisions = true;
+
+        result.meshes[1].position.x = 5;
+        result.meshes[1].position.y = 0;
+        result.meshes[1].position.z = -5;
+
+     
+
+        result.meshes[1].scaling.x = 20;
+        result.meshes[1].scaling.y = 20;
+        result.meshes[1].scaling.z = 20;
+
+        // const myMesh1 = scene.getMeshByName("__root__");
+        // myMesh1.rotation.y = Math.PI / 2;
+      });
+
+      BABYLON.SceneLoader.ImportMeshAsync("", "", "28.06.2023_2.glb").then((result) => {
+        console.log(result);
+
+        result.meshes[1].checkCollisions = true;
+
+        result.meshes[1].position.x = -5;
+        result.meshes[1].position.y = 4;
+        result.meshes[1].position.z = 5;
+
+        result.meshes[1].rotation = new BABYLON.Vector3(0,40,0);
+
+       // result.meshes[1].rotation.y = 90;
+        
+
+        result.meshes[1].scaling.x = 20;
+        result.meshes[1].scaling.y = 20;
+        result.meshes[1].scaling.z = 20;
+
+        
+
+        // const myMesh1 = scene.getMeshByName("__root__");
+        // myMesh1.rotation.y = Math.PI / 2;
+      });
+
+      BABYLON.SceneLoader.ImportMeshAsync("", "", "28.06.2023_arch.glb").then((result) => {
+        console.log(result);
+
+        result.meshes[1].checkCollisions = true;
+
+        //result.meshes[1].position.x = -5;
+        result.meshes[1].position.y = 1.5;
+        //result.meshes[1].position.z = 5;
+
+       // result.meshes[1].rotation = new BABYLON.Vector3(0,40,0);
+
+       // result.meshes[1].rotation.y = 90;
+        
+
+        result.meshes[1].scaling.x = 25;
+        result.meshes[1].scaling.y = 25;
+        result.meshes[1].scaling.z = 25;
+
+        
+
+        // const myMesh1 = scene.getMeshByName("__root__");
+        // myMesh1.rotation.y = Math.PI / 2;
+      });
+*/
+
+      BABYLON.SceneLoader.ImportMeshAsync("", "", "28.06.2023_5.glb").then((result) => {
+        console.log(result);
+
+        result.meshes[1].checkCollisions = true;
+
+        //   result.meshes[1].position.x = -5;
+        result.meshes[1].position.y = 3;
+        //   result.meshes[1].position.z = 5;
+
+        //result.meshes[1].rotation = new BABYLON.Vector3(4, 0, 0);
+
+        // result.meshes[1].rotation.y = 90;
+
+
+        result.meshes[1].scaling.x = 70;
+        result.meshes[1].scaling.y = 70;
+        result.meshes[1].scaling.z = 70;
+
+
+
+        // const myMesh1 = scene.getMeshByName("__root__");
+        // myMesh1.rotation.y = Math.PI / 2;
+      });
+
+      ///////////////////// SOUND //////////////////
+
+      ctx = new (AudioContext || webkitAudioContext)();
+     // ctx.suspend();
+
+      var bird_sound = new BABYLON.Sound("bird", "sounds/Ice_Cavern_Loop.wav", scene,
+        null, { loop: true, volume: 0.75, autoplay: false, maxDistance: 300, useCustomAttenuation: false});
+
+
+      bird_sound.setAttenuationFunction(function (
+        currentVolume,
+        currentDistance,
+        maxDistance,
+        refDistance = 300,
+        rolloffFactor
+      ) {
+        return ((currentVolume * 2) * currentDistance) / maxDistance;
+      });
+
+      /////////////////////////////////////////////
+
+      /////// HELPER MESHES ////////////////
+
+      // Create materials
+      var glass = new BABYLON.PBRMaterial("glass", scene);
+      glass.reflectionTexture = texture;
+      glass.indexOfRefraction = 0.52;
+      glass.alpha = 0.5;
+      glass.directIntensity = 0.0;
+      glass.environmentIntensity = 0.7;
+      glass.cameraExposure = 0.66;
+      glass.cameraContrast = 1.66;
+      glass.microSurface = 1;
+      glass.reflectivityColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+      glass.albedoColor = new BABYLON.Color3(0.95, 0.95, 0.95);
+
+      var pbr = new BABYLON.PBRMaterial("pbr", scene);
+      pbr.metallic = 0.0;
+      pbr.roughness = 0;
+
+      pbr.subSurface.isRefractionEnabled = true;
+      pbr.subSurface.indexOfRefraction = 1.8;
+
+      // Create meshes
+      var sphereGlass = BABYLON.Mesh.CreateSphere("sphereGlass", 128, 5, scene);
+      sphereGlass.translate(new BABYLON.Vector3(2, 5, 1), 0);
+      bird_sound.attachToMesh(sphereGlass);
+      sphereGlass.material = glass;
+
+
+      ///////////////////////////////////
+      const pane = new Tweakpane({
+        title: 'sounds',
+        expanded: true,
+      });
+
+      const btn = pane.addButton({
+        title: '► | ◼︎',
+        label: 'sound',
+      });
+
+
+      btn.on('click', () => {
+        console.log(ctx.state);
+        if (ctx.state === 'running') {
+          ctx.suspend().then(function () {
+
+            bird_sound.pause();
+
+          })
+
+        } else if (ctx.state === 'suspended') {
+          ctx.resume().then(function () {
+
+            bird_sound.play();
+
+          })
+
+        }
+
+      });
+
+
+
+      // Add highlight layer
+      var hl = new BABYLON.HighlightLayer("hl1", scene);
+
+      const environment = scene.createDefaultEnvironment();
+
+      // Initialize XR experience with default experience helper.
+      const xr = await scene.createDefaultXRExperienceAsync({
+        // floorMeshes: [scene.getMeshByName("Floor")]
+        floorMeshes: [environment.ground]
+      });
+
+
+      // Get the features manager
+      //const fm = xr.baseExperience.featuresManager;
+
+      //// THEREMIN
+
+      // Create new Audio Context
+      var context = new AudioContext();
+      mousedown = false;
+      oscillator = null;
+      gainNode = context.createGain();
+
+      // Calculate frequency relative to PitchAntenna
+      var calculateFrequency = function (distance) {
+        var minFrequency = 20;
+        maxFrequency = 2000;
+
+        var pitchSensitivity = 10;
+
+        return (Math.exp(-distance * pitchSensitivity) * (maxFrequency - minFrequency)) + minFrequency;
+      };
+
+      var calculateGain = function (distance) {
+        var minGain = 0;
+        maxGain = 1;
+
+        var gainSensitivity = 20;
+
+        return (Math.exp(-distance * gainSensitivity) * (minGain - maxGain)) + maxGain;
+      }
+
+      /*
+      // Oscillator controls
+      scene.onPointerObservable.add((pointerInfo) => {
+
+        const meshId = pointerInfo.event.pointerId;
+
+        const xrInputRight = xr.pointerSelection.getXRControllerByPointerId(200);
+        const xrInputLeft = xr.pointerSelection.getXRControllerByPointerId(201);
+
+        var pickResult = pointerInfo.pickInfo;
+
+        switch (pointerInfo.type) {
+              case BABYLON.PointerEventTypes.POINTERDOWN:
+                  context.resume().then(() => {
+                    mousedown = true;
+                    oscillator = context.createOscillator();
+                    oscillator.frequency.setTargetAtTime(calculateFrequency(scene.pointerX), context.currentTime, 0.01);
+                    oscillator.connect(gainNode);
+                    gainNode.connect(context.destination);
+                    oscillator.start(context.currentTime);
+                  });
+                break;
+              case BABYLON.PointerEventTypes.POINTERUP:
+                mousedown = false;
+                if (oscillator) {
+                  oscillator.stop(context.currentTime);
+                  oscillator.disconnect();
+                }
+                  break;
+              case BABYLON.PointerEventTypes.POINTERMOVE:
+                if (mousedown) {
+                  var rootPosRight = xrInputRight.grip._absolutePosition;
+                  var pitchDistance = BABYLON.Vector3.DistanceSquared(rootPosRight, pitchAntennaPosition);
+                  var rootPosLeft = xrInputLeft.grip._absolutePosition;
+                  var volumeDistance = BABYLON.Vector3.DistanceSquared(rootPosLeft, volumeAntennaPosition);
+
+                  oscillator.frequency.setTargetAtTime(calculateFrequency(pitchDistance), context.currentTime, 0.01);
+                  gainNode.gain.setTargetAtTime(calculateGain(volumeDistance), context.currentTime, 0.01);
+                } else {
+                }
+
+                // Control panel hover events
+                  if(pickResult.hit && pickResult.pickedMesh.id == "On_Off") {
+                    hl.addMesh(onOffButton, BABYLON.Color3.Green());
+                    hl.addMesh(einAus, BABYLON.Color3.Green());
+                    einAus.setEnabled(true);
+                  } else if(pickResult.hit && pickResult.pickedMesh.id == "Dial_4"){
+                    hl.addMesh(dial4, BABYLON.Color3.Green());
+                    hl.addMesh(dial4Text, BABYLON.Color3.Green());
+                    dial4Text.setEnabled(true);
+                  } else if(pickResult.hit && pickResult.pickedMesh.id == "Dial_3"){
+                    hl.addMesh(dial3, BABYLON.Color3.Green());
+                    hl.addMesh(dial3Text, BABYLON.Color3.Green());
+                    dial3Text.setEnabled(true);
+                  } else if(pickResult.hit && pickResult.pickedMesh.id == "Dial_2"){
+                    hl.addMesh(dial2, BABYLON.Color3.Green());
+                    hl.addMesh(dial2Text, BABYLON.Color3.Green());
+                    dial2Text.setEnabled(true);
+                  } else if(pickResult.hit && pickResult.pickedMesh.id == "Dial_1"){
+                    hl.addMesh(dial1, BABYLON.Color3.Green());
+                    hl.addMesh(dial1Text, BABYLON.Color3.Green());
+                    dial1Text.setEnabled(true);
+                  } else {
+                    hl.removeMesh(onOffButton);
+                    einAus.setEnabled(false);
+                    hl.removeMesh(dial4);
+                    dial4Text.setEnabled(false);
+                    hl.removeMesh(dial3);
+                    dial3Text.setEnabled(false);
+                    hl.removeMesh(dial2);
+                    dial2Text.setEnabled(false);
+                    hl.removeMesh(dial1);
+                    dial1Text.setEnabled(false);
+                  }
+              break;
+          }
+      });
+*/
+      return scene;
+    };
+
+    // Create engine.
+    engine = createDefaultEngine();
+    if (!engine) {
+      throw 'Engine should not be null';
+    }
+
+    // Create scene.
+    scene = createScene();
+    scene.then(function (returnedScene) {
+      sceneToRender = returnedScene;
+    });
+
+    // Run render loop to render future frames.
+    engine.runRenderLoop(function () {
+      if (sceneToRender) {
+        sceneToRender.render();
+      }
+    });
+
+    // Handle browser resize.
+    window.addEventListener('resize', function () {
+      engine.resize();
+    });
+
+
+
+
+  </script>
+</body>
+
+</html>
